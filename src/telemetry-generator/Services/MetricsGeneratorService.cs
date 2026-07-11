@@ -73,7 +73,7 @@ public sealed class MetricsGeneratorService : BackgroundService
             description: "GPU utilization percentage");
 
         _meter.CreateObservableGauge(
-            "dc.rack.network_throughput_mbps",
+            "dc.rack.network_throughput",
             () => _currentMetrics.Select(r => new Measurement<double>(r.NetworkThroughputMbps, new KeyValuePair<string, object?>("rack_id", r.RackId))),
             unit: "Mbit/s",
             description: "Network throughput in Megabits per second");

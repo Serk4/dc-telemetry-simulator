@@ -116,7 +116,7 @@ All metrics are exported under the `dc.telemetry` meter and scraped by Prometheu
 | `dc_rack_power_draw_watts` | W | Rack power draw |
 | `dc_rack_cooling_load_percent` | % | Cooling system load |
 | `dc_rack_gpu_utilization_percent` | % | GPU utilization |
-| `dc_rack_network_throughput_mbps_Mbit_per_second` | Mbit/s | Network throughput |
+| `dc_rack_network_throughput_Mbit_per_second` | Mbit/s | Network throughput |
 | `dc_rack_node_healthy` | 0/1 | Node health (1 = healthy) |
 
 ---

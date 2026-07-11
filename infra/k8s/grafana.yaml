@@ -110,7 +110,7 @@ data:
           "targets": [
             {
               "datasource": "Prometheus",
-              "expr": "dc_rack_network_throughput_mbps_Mbit_per_second",
+              "expr": "dc_rack_network_throughput_Mbit_per_second",
               "legendFormat": "{{rack_id}}"
             }
           ],
@@ -182,6 +182,7 @@ spec:
               name: http
           env:
             - name: GF_SECURITY_ADMIN_PASSWORD
+              # For local development only. Use a Kubernetes Secret in production.
               value: "admin"
             - name: GF_AUTH_ANONYMOUS_ENABLED
               value: "true"
