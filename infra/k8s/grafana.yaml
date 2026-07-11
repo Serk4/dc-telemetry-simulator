@@ -1,0 +1,229 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-provider
+  namespace: monitoring
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: default
+        orgId: 1
+        folder: DC Telemetry
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 30
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+data:
+  prometheus.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus.monitoring.svc.cluster.local:9090
+        access: proxy
+        isDefault: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-dc-telemetry
+  namespace: monitoring
+data:
+  dc-telemetry.json: |
+    {
+      "title": "DC Telemetry",
+      "uid": "dc-telemetry-v1",
+      "schemaVersion": 39,
+      "refresh": "10s",
+      "time": { "from": "now-30m", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "Rack Temperature (°C)",
+          "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "datasource": "Prometheus",
+              "expr": "dc_rack_temperature_celsius",
+              "legendFormat": "{{rack_id}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "thresholds": {
+                "steps": [
+                  { "value": null, "color": "green" },
+                  { "value": 70, "color": "yellow" },
+                  { "value": 80, "color": "red" }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "GPU Utilization (%)",
+          "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "datasource": "Prometheus",
+              "expr": "dc_rack_gpu_utilization_percent",
+              "legendFormat": "{{rack_id}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percent", "min": 0, "max": 100 }
+          }
+        },
+        {
+          "id": 3,
+          "type": "timeseries",
+          "title": "Power Draw (W)",
+          "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "datasource": "Prometheus",
+              "expr": "dc_rack_power_draw_watts",
+              "legendFormat": "{{rack_id}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "watt" }
+          }
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "Network Throughput (Mbps)",
+          "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "datasource": "Prometheus",
+              "expr": "dc_rack_network_throughput_mbps_Mbit_per_second",
+              "legendFormat": "{{rack_id}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "Mbit/s" }
+          }
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Node Health",
+          "gridPos": { "x": 0, "y": 16, "w": 12, "h": 4 },
+          "targets": [
+            {
+              "datasource": "Prometheus",
+              "expr": "dc_rack_node_healthy",
+              "legendFormat": "{{rack_id}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "options": { "0": { "text": "Degraded", "color": "red" }, "1": { "text": "Healthy", "color": "green" } }, "type": "value" }
+              ]
+            }
+          }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Cooling Load (%)",
+          "gridPos": { "x": 12, "y": 16, "w": 12, "h": 4 },
+          "targets": [
+            {
+              "datasource": "Prometheus",
+              "expr": "dc_rack_cooling_load_percent",
+              "legendFormat": "{{rack_id}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percent", "min": 0, "max": 100 }
+          }
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.0.0
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin"
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: "Viewer"
+          volumeMounts:
+            - name: dashboards-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboard-json
+              mountPath: /var/lib/grafana/dashboards
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: dashboards-provider
+          configMap:
+            name: grafana-dashboards-provider
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboard-json
+          configMap:
+            name: grafana-dashboard-dc-telemetry
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  selector:
+    app: grafana
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+  type: ClusterIP
