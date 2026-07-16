@@ -16,13 +16,13 @@ We simulate telemetry; we do **NOT** model real electrical systems.
 
 ## TECH STACK
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | C# / .NET 10, Minimal API, Background Hosted Service |
-| Observability | OpenTelemetry (metrics, logs, traces), Prometheus exporter |
-| Infrastructure | Kubernetes (local: k3d or kind), Prometheus, Grafana |
-| IaC | Terraform (minimal: cluster + namespaces + manifest apply) |
-| Optional UI | React (Vite) |
+| Layer          | Technology                                                 |
+| -------------- | ---------------------------------------------------------- |
+| Backend        | C# / .NET 10, Minimal API, Background Hosted Service       |
+| Observability  | OpenTelemetry (metrics, logs, traces), Prometheus exporter |
+| Infrastructure | Kubernetes (local: k3d or kind), Prometheus, Grafana       |
+| IaC            | Terraform (minimal: cluster + namespaces + manifest apply) |
+| Optional UI    | React (Vite)                                               |
 
 ---
 
@@ -32,16 +32,17 @@ We simulate telemetry; we do **NOT** model real electrical systems.
 
 Generates fake data center metrics:
 
-| Metric | Unit | Range |
-|--------|------|-------|
-| rack temperature | °C | 20–90 (spikes >80 at 5% probability) |
-| power draw | W | 500–4000 |
-| cooling load | % | 0–100 |
-| GPU utilization | % | 0–100 |
-| network throughput | Mbit/s | 0–10 000 |
-| node health | boolean | 98% healthy |
+| Metric             | Unit    | Range                                |
+| ------------------ | ------- | ------------------------------------ |
+| rack temperature   | °C      | 20–90 (spikes >80 at 5% probability) |
+| power draw         | W       | 500–4000                             |
+| cooling load       | %       | 0–100                                |
+| GPU utilization    | %       | 0–100                                |
+| network throughput | Mbit/s  | 0–10 000                             |
+| node health        | boolean | 98% healthy                          |
 
 Exposes:
+
 - `/metrics` — Prometheus scrape endpoint (OpenTelemetry Prometheus exporter)
 - `/api/status` — JSON snapshot of current rack metrics
 - `/healthz` — liveness/readiness probe
@@ -63,20 +64,178 @@ Exposes:
 
 ### 3. Kubernetes Manifests
 
-- Namespace `telemetry`: Deployment + Service for telemetry-generator
-- Namespace `monitoring`: Prometheus + Grafana Deployments + Services
+#### 3.1 Namespaces
 
-### 4. Terraform (minimal)
+- Create two namespaces:
+  - `telemetry`
+  - `monitoring`
 
-- Provision local k3d or kind cluster
-- Create namespaces via Terraform kubernetes provider
-- Apply manifests via `kubectl apply` local-exec
+#### 3.2 Telemetry Generator (Namespace: telemetry)
+
+- Deployment:
+  - Name: telemetry-generator
+  - Image: telemetry-generator:latest (placeholder)
+  - Port: 8080
+  - Environment variables: none initially
+  - Resources:
+    - requests: cpu 100m, memory 128Mi
+    - limits: cpu 500m, memory 256Mi
+  - Readiness probe: GET /api/status
+  - Liveness probe: GET /api/status
+  - Prometheus annotations:
+    - prometheus.io/scrape: "true"
+    - prometheus.io/port: "8080"
+    - prometheus.io/path: "/metrics"
+- Service:
+  - Type: ClusterIP
+  - Port: 8080
+
+#### 3.3 Prometheus (Namespace: monitoring)
+
+- Deployment:
+  - Use Prometheus image: prom/prometheus:latest
+  - Mount ConfigMap for prometheus.yaml
+  - Expose port 9090
+- Service:
+  - Type: ClusterIP
+  - Port: 9090
+
+#### 3.4 Grafana (Namespace: monitoring)
+
+- Deployment:
+  - Use Grafana image: grafana/grafana:latest
+  - Mount dashboards ConfigMap
+  - Mount datasources ConfigMap
+  - Expose port 3000
+- Service:
+  - Type: ClusterIP
+  - Port: 3000
+
+#### 3.5 File Placement
+
+- Place all manifests in `infra/k8s/`
+- Use separate files:
+  - telemetry-namespace.yaml
+  - telemetry-generator-deployment.yaml
+  - telemetry-generator-service.yaml
+  - monitoring-namespace.yaml
+  - prometheus-deployment.yaml
+  - prometheus-service.yaml
+  - grafana-deployment.yaml
+  - grafana-service.yaml
+
+### 4. Terraform (minimal but structured)
+
+#### 4.1 Terraform Project Structure
+
+- Place all Terraform files in `infra/terraform/`
+- Use the following files:
+  - `main.tf`
+  - `providers.tf`
+  - `variables.tf`
+  - `outputs.tf`
+
+#### 4.2 Local Kubernetes Cluster Provisioning
+
+- Use either `k3d` or `kind` (choose one; default to k3d)
+- Provision a local cluster named `telemetry-cluster`
+- Use `null_resource` + `local-exec` to run cluster creation commands
+- Ensure kubeconfig is written to a known path:
+  - `${path.module}/kubeconfig`
+
+#### 4.3 Kubernetes Provider Configuration
+
+- Use the Terraform Kubernetes provider
+- Configure provider to use the generated kubeconfig:
+
+```hcl
+provider "kubernetes" {
+  config_path = "${path.module}/kubeconfig"
+}
+```
+
+#### 4.4 Namespace Creation
+
+- Create namespaces via Terraform resources:
+- `kubernetes_namespace.telemetry`
+- `kubernetes_namespace.monitoring`
+
+#### 4.5 Applying Kubernetes Manifests
+
+- Use `null_resource` + `local-exec` to apply manifests:
+- Apply all YAML files in `infra/k8s/`
+- Use:
+  ```bash
+  kubectl apply -f ../../infra/k8s
+  ```
+- Ensure apply runs **after** namespaces are created
+- Use `depends_on` to enforce ordering
+
+#### 4.6 Outputs
+
+- Output:
+- cluster name
+- kubeconfig path
+- telemetry namespace
+- monitoring namespace
+
+### 5. Prometheus Alerting Rules
+
+#### 5.1 Rule Definitions
+
+Create Prometheus alerting rules for the following conditions:
+
+- RackTemperatureHigh
+  - Condition: rack_temperature > 80°C
+  - Duration: 1m
+  - Severity: warning
+
+- RackTemperatureCritical
+  - Condition: rack_temperature > 90°C
+  - Duration: 30s
+  - Severity: critical
+
+- NodeDegraded
+  - Condition: node_health == 0
+  - Duration: 30s
+  - Severity: warning
+
+#### 5.2 File Format
+
+- Use standard Prometheus rule group YAML:
+  - apiVersion: monitoring.coreos.com/v1
+  - kind: PrometheusRule
+  - metadata:
+    name: telemetry-rules
+    namespace: monitoring
+  - spec:
+    groups: - name: telemetry.rules
+    rules: [...]
+
+#### 5.3 File Placement
+
+- Place rule file in: `infra/k8s/prometheus-rules.yaml`
+
+#### 5.4 Integration
+
+- Ensure Prometheus Deployment mounts the rule ConfigMap
+- Ensure Prometheus is configured to load rule files from:
+  `/etc/prometheus/rules`
+
+#### 5.5 Requirements
+
+- Clean, valid YAML
+- No duplicate rule names
+- Use labels:
+  - severity: <warning|critical>
+  - service: telemetry-generator
 
 ---
 
 ## NON-GOALS
 
 Do NOT implement:
+
 - Real electrical engineering simulation
 - Real SCADA systems
 - Real GPU cluster orchestration
@@ -134,6 +293,7 @@ Do NOT implement:
 - Reference `copilot-instructions.md` as source of truth
 
 ## Skills to Use
+
 - Kubernetes Deployment Authoring
 - Terraform Authoring
 - Grafana Dashboard Authoring
