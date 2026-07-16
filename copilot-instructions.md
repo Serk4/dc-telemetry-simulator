@@ -18,7 +18,7 @@ We simulate telemetry; we do **NOT** model real electrical systems.
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | C# / .NET 8, Minimal API, Background Hosted Service |
+| Backend | C# / .NET 10, Minimal API, Background Hosted Service |
 | Observability | OpenTelemetry (metrics, logs, traces), Prometheus exporter |
 | Infrastructure | Kubernetes (local: k3d or kind), Prometheus, Grafana |
 | IaC | Terraform (minimal: cluster + namespaces + manifest apply) |
@@ -90,7 +90,7 @@ Do NOT implement:
 ## FOLDER STRUCTURE
 
 ```
-/src/telemetry-generator        C# .NET 8 Minimal API service
+/src/telemetry-generator        C# .NET 10 Minimal API service
   /Models                       Record types (RackMetrics, StatusResponse)
   /Services                     MetricsGeneratorService (IHostedService)
   Program.cs                    App bootstrap + endpoint registration
@@ -131,4 +131,10 @@ Do NOT implement:
 - Generate code in small steps
 - Do **NOT** hallucinate hardware details
 - Stay software-focused
-- Reference `INSTRUCTIONS.md` as source of truth
+- Reference `copilot-instructions.md` as source of truth
+
+## Skills to Use
+- Kubernetes Deployment Authoring
+- Terraform Authoring
+- Grafana Dashboard Authoring
+- Prometheus Rule Authoring
