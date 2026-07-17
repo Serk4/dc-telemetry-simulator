@@ -230,6 +230,94 @@ Create Prometheus alerting rules for the following conditions:
   - severity: <warning|critical>
   - service: telemetry-generator
 
+### 6. Grafana Dashboards
+
+#### 6.1 Dashboard Requirements
+
+Create a Grafana dashboard named "DC Telemetry Overview" containing:
+
+- Rack Temperature graph
+  - Threshold line at 80°C
+  - Color change above threshold
+
+- GPU Utilization graph
+  - 0–100% range
+  - Single time-series panel
+
+- Power Draw graph
+  - 500–4000 W range
+
+- Network Throughput graph
+  - 0–10,000 Mbit/s range
+
+- Cooling Load graph
+  - 0–100% range
+
+- Node Health stat panel
+  - Green = healthy
+  - Red = degraded
+
+#### 6.2 File Format
+
+- Use Grafana JSON dashboard format (apiVersion: 1)
+- Must be valid JSON
+- Must be compatible with Grafana provisioning
+
+#### 6.3 File Placement
+
+- Place dashboard JSON in:
+  `infra/k8s/grafana-dashboard.json`
+
+#### 6.4 Integration
+
+- Ensure Grafana Deployment mounts:
+  - dashboards ConfigMap
+  - datasources ConfigMap
+
+- ConfigMap must place dashboards under:
+  `/var/lib/grafana/dashboards`
+
+### 7. Optional UI — React (Vite)
+
+#### 7.1 Project Structure
+
+Create a minimal React (Vite) UI in `/ui/` with:
+
+- Vite + React + TypeScript
+- TailwindCSS (optional)
+- Axios for API calls
+
+#### 7.2 Features
+
+- Display `/api/status` metrics from telemetry-generator
+- Auto-refresh every 5 seconds
+- Panels:
+  - Rack temperature
+  - GPU utilization
+  - Power draw
+  - Network throughput
+  - Cooling load
+  - Node health
+
+#### 7.3 File Placement
+
+- `/ui/src/App.tsx` — main UI
+- `/ui/src/api.ts` — API client
+- `/ui/index.html` — root HTML
+
+#### 7.4 Requirements
+
+- Clean, minimal UI
+- No charts required (text + simple bars OK)
+- Must run locally via:
+  `npm install && npm run dev`
+
+#### 7.5 Non-goals
+
+- No Kubernetes deployment for UI
+- No Terraform integration
+- No authentication
+
 ---
 
 ## NON-GOALS

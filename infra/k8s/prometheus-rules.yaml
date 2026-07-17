@@ -1,0 +1,41 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: telemetry-rules
+  namespace: monitoring
+  labels:
+    prometheus: telemetry
+spec:
+  groups:
+    - name: telemetry.rules
+      interval: 15s
+      rules:
+        - alert: RackTemperatureHigh
+          expr: dc_rack_temperature_celsius > 80
+          for: 1m
+          labels:
+            severity: warning
+            service: telemetry-generator
+          annotations:
+            summary: "Rack temperature is {{ $value | humanize }}°C"
+            description: "Rack temperature has exceeded 80°C for more than 1 minute."
+
+        - alert: RackTemperatureCritical
+          expr: dc_rack_temperature_celsius > 90
+          for: 30s
+          labels:
+            severity: critical
+            service: telemetry-generator
+          annotations:
+            summary: "CRITICAL: Rack temperature is {{ $value | humanize }}°C"
+            description: "Rack temperature has exceeded 90°C. Immediate action required."
+
+        - alert: NodeDegraded
+          expr: dc_rack_node_healthy == 0
+          for: 30s
+          labels:
+            severity: warning
+            service: telemetry-generator
+          annotations:
+            summary: "Node is degraded"
+            description: "A node has been reporting unhealthy for more than 30 seconds."
