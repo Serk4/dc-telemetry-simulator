@@ -32,41 +32,41 @@ const HealthBadge: React.FC<{ healthy: boolean }> = ({ healthy }) => (
 );
 
 const RackPanel: React.FC<{ rack: RackMetrics }> = ({ rack }) => {
-  const tempColor = rack.temperature_celsius > 80 ? 'red' : rack.temperature_celsius > 70 ? 'yellow' : 'green';
+  const tempColor = rack.temperatureCelsius > 80 ? 'red' : rack.temperatureCelsius > 70 ? 'yellow' : 'green';
 
   return (
     <div className="rack-panel">
       <div className="rack-header">
-        <h2>Rack {rack.rack_id}</h2>
-        <HealthBadge healthy={rack.node_healthy} />
+        <h2>Rack {rack.rackId}</h2>
+        <HealthBadge healthy={rack.nodeHealthy} />
       </div>
 
       <div className="metrics-grid">
         <MetricBar
           label="Temperature"
-          value={rack.temperature_celsius}
+          value={rack.temperatureCelsius}
           max={100}
           unit="°C"
           color={tempColor}
         />
         <MetricBar
           label="GPU Utilization"
-          value={rack.gpu_utilization_percent}
+          value={rack.gpuUtilizationPercent}
           max={100}
           unit="%"
           color="blue"
         />
-        <MetricBar label="Power Draw" value={rack.power_draw_watts} max={4000} unit="W" color="orange" />
+        <MetricBar label="Power Draw" value={rack.powerDrawWatts} max={4000} unit="W" color="orange" />
         <MetricBar
           label="Network Throughput"
-          value={rack.network_throughput_Mbit_per_second}
+          value={rack.networkThroughputMbps}
           max={10000}
           unit="Mbit/s"
           color="purple"
         />
         <MetricBar
           label="Cooling Load"
-          value={rack.cooling_load_percent}
+          value={rack.coolingLoadPercent}
           max={100}
           unit="%"
           color="cyan"
@@ -80,26 +80,38 @@ export default function App() {
   const [data, setData] = useState<StatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const fetchData = async () => {
     try {
-      setLoading(true);
+      console.log('[App] Fetching data...');
       setError(null);
       const response = await api.getStatus();
+      console.log('[App] Data fetched successfully:', response);
       setData(response);
+      setLoading(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch metrics');
-      console.error(err);
-    } finally {
+      console.error('[App] Error fetching data:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Failed to fetch metrics';
+      setError(errorMsg);
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
-  }, []);
+    console.log('[App] Component mounted, initializing...');
+    if (!isInitialized) {
+      setIsInitialized(true);
+      fetchData();
+      const interval = setInterval(fetchData, 5000);
+      return () => {
+        console.log('[App] Cleaning up interval');
+        clearInterval(interval);
+      };
+    }
+  }, [isInitialized]);
+
+  console.log('[App] Render state:', { loading, error, hasData: !!data });
 
   return (
     <div className="app">
@@ -114,14 +126,21 @@ export default function App() {
       </header>
 
       <main className="app-main">
-        {error && <div className="error-banner">{error}</div>}
+        {error && (
+          <div className="error-banner">
+            <strong>Error:</strong> {error}
+            <br />
+            <small>Make sure the telemetry-generator service is running on http://localhost:5249</small>
+          </div>
+        )}
         {loading && !data && <div className="loading">Loading metrics...</div>}
+        {!loading && !data && !error && <div className="no-data">No rack data available</div>}
         {data && (
           <div className="racks-container">
             {data.racks.length > 0 ? (
-              data.racks.map((rack) => <RackPanel key={rack.rack_id} rack={rack} />)
+              data.racks.map((rack) => <RackPanel key={rack.rackId} rack={rack} />)
             ) : (
-              <div className="no-data">No rack data available</div>
+              <div className="no-data">No racks found in telemetry data</div>
             )}
           </div>
         )}

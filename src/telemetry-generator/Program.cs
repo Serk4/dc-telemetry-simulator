@@ -12,6 +12,18 @@ var builder = WebApplication.CreateBuilder(args);
 const string ServiceName = "dc-telemetry-generator";
 const string ServiceVersion = "1.0.0";
 
+// ── CORS ──────────────────────────────────────────────────────────────────────
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
+
 // ── Logging ──────────────────────────────────────────────────────────────────
 builder.Logging.ClearProviders();
 builder.Logging.AddOpenTelemetry(logging =>
@@ -46,6 +58,9 @@ var activitySource = new ActivitySource(ServiceName);
 builder.Services.AddSingleton(activitySource);
 
 var app = builder.Build();
+
+// ── Use CORS ──────────────────────────────────────────────────────────────────
+app.UseCors();
 
 // ── Prometheus scrape endpoint ────────────────────────────────────────────────
 app.MapPrometheusScrapingEndpoint("/metrics");
